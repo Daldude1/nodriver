@@ -141,6 +141,15 @@ class Tab(Connection):
         """
         return f"http://{self.browser.config.host}:{self.browser.config.port}/devtools/inspector.html?ws={self.websocket_url[5:]}"
 
+    @property
+    def current_url(self):
+        """
+        returns the current url of browser.
+        :return: Current url.
+        :rtype: str
+        """
+        return self.target.url
+
     def inspector_open(self):
         import webbrowser
 
