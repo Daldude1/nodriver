@@ -13,6 +13,9 @@ import urllib.request
 import warnings
 from collections import defaultdict
 from typing import List, Union, Tuple
+import http.cookiejar
+
+from nodriver.cdp import target
 
 from .. import cdp
 from . import util
@@ -784,7 +787,7 @@ class HTTPApi:
         self.api = "http://%s:%d" % (self.host, self.port)
 
     @classmethod
-    def from_target(cls, target: "Target"):
+    def from_target(cls, target: "target"):
         ws_url = urllib.parse.urlparse(target.websocket_url)
         inst = cls((ws_url.hostname, ws_url.port))
         return inst
