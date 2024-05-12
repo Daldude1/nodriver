@@ -9,10 +9,7 @@ from typing import Optional, List, Set, Union, Callable
 
 import typing
 
-import undetected_chromedriver
-
 from .element import Element
-import nodriver
 
 if typing.TYPE_CHECKING:
     from .browser import Browser, PathLike

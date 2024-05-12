@@ -19,7 +19,6 @@ from typing import (
     TypeVar,
 )
 
-from nodriver import Browser
 import websockets
 
 from . import util
