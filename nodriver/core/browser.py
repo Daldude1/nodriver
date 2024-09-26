@@ -69,6 +69,8 @@ class Browser:
         browser_executable_path: PathLike = None,
         browser_args: List[str] = None,
         sandbox: bool = True,
+        host: str = None,
+        port: int = None,
         **kwargs,
     ) -> Browser:
         """
@@ -81,6 +83,8 @@ class Browser:
                 browser_executable_path=browser_executable_path,
                 browser_args=browser_args or [],
                 sandbox=sandbox,
+                host=host,
+                port=port,
                 **kwargs,
             )
         instance = cls(config)
@@ -198,7 +202,7 @@ class Browser:
             new_target = Tab(
                 (
                     f"ws://{self.config.host}:{self.config.port}"
-                    f"/devtools/page"  # all types are 'page' internally in chrome apparently
+                    f"/devtools/{target_info.type_ or 'page'}"  # all types are 'page' internally in chrome apparently
                     f"/{target_info.target_id}"
                 ),
                 target=target_info,
@@ -241,20 +245,24 @@ class Browser:
                 )
             )
             # get the connection matching the new target_id from our inventory
-            connection = next(
+            connection: tab.Tab = next(
                 filter(
                     lambda item: item.type_ == "page" and item.target_id == target_id,
                     self.targets,
                 )
             )
+            connection.browser = self
 
         else:
             # first tab from browser.tabs
-            connection = next(filter(lambda item: item.type_ == "page", self.targets))
+            connection: tab.Tab = next(
+                filter(lambda item: item.type_ == "page", self.targets)
+            )
             # use the tab to navigate to new url
             frame_id, loader_id, *_ = await connection.send(cdp.page.navigate(url))
             # update the frame_id on the tab
             connection.frame_id = frame_id
+            connection.browser = self
 
         await connection.sleep(0.25)
         return connection
@@ -264,6 +272,7 @@ class Browser:
         if not self:
             warnings.warn("use ``await Browser.create()`` to create a new instance")
             return
+
         if self._process or self._process_pid:
             if self._process.returncode is not None:
                 return await self.create(config=self.config)
@@ -272,28 +281,32 @@ class Browser:
 
         # self.config.update(kwargs)
         connect_existing = False
-        if self.config.host and self.config.port:
+        if self.config.host is not None and self.config.port is not None:
             connect_existing = True
-        self.config.host = self.config.host or "127.0.0.1"
-        self.config.port = self.config.port or util.free_port()
+        else:
+            self.config.host = "127.0.0.1"
+            self.config.port = util.free_port()
 
-        logger.debug("BROWSER EXECUTABLE PATH: %s", self.config.browser_executable_path)
-        if not pathlib.Path(self.config.browser_executable_path).exists():
-            raise FileNotFoundError(
-                (
-                    """
-                ---------------------
-                Could not determine browser executable.
-                ---------------------
-                Make sure your browser is installed in the default location (path).
-                If you are sure about the browser executable, you can specify it using
-                the `browser_executable_path='{}` parameter."""
-                ).format(
-                    "/path/to/browser/executable"
-                    if is_posix
-                    else "c:/path/to/your/browser.exe"
-                )
+        if not connect_existing:
+            logger.debug(
+                "BROWSER EXECUTABLE PATH: %s", self.config.browser_executable_path
             )
+            if not pathlib.Path(self.config.browser_executable_path).exists():
+                raise FileNotFoundError(
+                    (
+                        """
+                    ---------------------
+                    Could not determine browser executable.
+                    ---------------------
+                    Make sure your browser is installed in the default location (path).
+                    If you are sure about the browser executable, you can specify it using
+                    the `browser_executable_path='{}` parameter."""
+                    ).format(
+                        "/path/to/browser/executable"
+                        if is_posix
+                        else "c:/path/to/your/browser.exe"
+                    )
+                )
 
         if getattr(self.config, "_extensions", None):  # noqa
             self.config.add_argument(
@@ -320,14 +333,10 @@ class Browser:
                     close_fds=is_posix,
                 )
             )
-
             self._process_pid = self._process.pid
-            logger.info("created process with pid %d " % self._process_pid)
 
         self._http = HTTPApi((self.config.host, self.config.port))
-
         util.get_registered_instances().add(self)
-
         await asyncio.sleep(0.25)
         for _ in range(5):
             try:
@@ -487,7 +496,8 @@ class Browser:
     async def update_targets(self):
         targets: List[cdp.target.TargetInfo]
         targets = await self._get_targets()
-
+        target_ids = [t.target_id for t in targets]
+        existing_target_ids = [t.target_id for t in self.targets]
         for t in targets:
             for existing_tab in self.targets:
                 existing_target = existing_tab.target
@@ -521,6 +531,9 @@ class Browser:
     def __iter__(self):
         self._i = self.tabs.index(self.main_tab)
         return self
+
+    def __reversed__(self):
+        return reversed(list(self.tabs))
 
     def __next__(self):
         try:
@@ -810,7 +823,7 @@ class HTTPApi:
             request.data = json.dumps(data).encode("utf-8")
 
         response = await asyncio.get_running_loop().run_in_executor(
-            None, urllib.request.urlopen, request
+            None, lambda: urllib.request.urlopen(request, timeout=10)
         )
         return json.loads(response.read())
 

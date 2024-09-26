@@ -1,7 +1,12 @@
 [project]
+
 name = "nodriver" # Required
-version = "0.29rc1"  # Required
+version = "0.37"  # Required
+
 description = """
+
+    [Docs here](https://ultrafunkamsterdam.github.io/nodriver)
+
     * Official successor of Undetected Chromedriver
     * Can be made to work for for all chromium based browsers.
     * Dropped selenium and chromedriver binary requirements.
@@ -46,10 +51,6 @@ maintainers = [
   {name = "UltrafunkAmsterdam", email = "doesnotexist@ultrafunk.nl" } # Optional
 ]
 classifiers = [  # Optional
-  # How mature is this project? Common values are
-  #   3 - Alpha
-  #   4 - Beta
-  #   5 - Production/Stable
 
     "Development Status :: 3 - Alpha",
     "Intended Audience :: Developers",
@@ -59,6 +60,8 @@ classifiers = [  # Optional
     "Programming Language :: Python :: 3.9",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
 
 ]
 
@@ -77,7 +80,7 @@ dependencies = [
 
 [tool.setuptools]
 include-package-data = true
-packages = ["nodriver"]
+packages = ["nodriver", "nodriver.core", "nodriver.cdp"]
 
 [build-system]
 requires = ["setuptools>=43.0.0", "wheel"]

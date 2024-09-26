@@ -735,14 +735,23 @@ class Element:
         return await self.apply("(element) => element.focus()")
 
     async def select_option(self):
-        """for form (select) fields. when you have queried the options you can call this method on the option object
+        """
+        for form (select) fields. when you have queried the options you can call this method on the option object.
+        02/08/2024: fixed the problem where events are not fired when programattically selecting an option.
 
         calling :func:`option.select_option()` will use that option as selected value.
         does not work in all cases.
 
         """
         if self.node_name == "OPTION":
-            return await self.apply("(o) => o.selected = true")
+            await self.apply(
+                """
+                (o) => {  
+                    o.selected = true ; 
+                    o.dispatchEvent(new Event('change', {view: window,bubbles: true}))
+                }
+                """
+            )
 
     async def set_value(self, value):
         await self._tab.send(cdp.dom.set_node_value(node_id=self.node_id, value=value))
@@ -1154,3 +1163,12 @@ class Position(cdp.dom.Quad):
 
     def __repr__(self):
         return f"<Position(x={self.left}, y={self.top}, width={self.width}, height={self.height})>"
+
+
+async def resolve_node(tab: Tab, node_id: cdp.dom.NodeId):
+    remote_obj: cdp.runtime.RemoteObject = await tab.send(
+        cdp.dom.resolve_node(node_id=node_id)
+    )
+    node_id: cdp.dom.NodeId = await tab.send(cdp.dom.request_node(remote_obj.object_id))
+    node: cdp.dom.Node = await tab.send(cdp.dom.describe_node(node_id))
+    return node

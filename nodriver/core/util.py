@@ -31,6 +31,9 @@ async def start(
     browser_args: Optional[List[str]] = None,
     sandbox: Optional[bool] = True,
     lang: Optional[str] = None,
+    host: Optional[str] = None,
+    port: Optional[int] = None,
+    expert: Optional[bool] = None,
     **kwargs: Optional[dict],
 ) -> Browser:
     """
@@ -38,6 +41,7 @@ async def start(
     conveniently, you can just call it bare (no parameters) to quickly launch an instance
     with best practice defaults.
     note: this should be called ```await start()```
+
 
     :param user_data_dir:
     :type user_data_dir: PathLike
@@ -57,9 +61,24 @@ async def start(
 
     :param lang: language string
     :type lang: str
+
+    :param port: if you connect to an existing debuggable session, you can specify the port here
+                 if both host and port are provided, nodriver will not start a local chrome browser!
+    :type port: int
+
+    :param host: if you connect to an existing debuggable session, you can specify the host here
+                 if both host and port are provided, nodriver will not start a local chrome browser!
+    :type host: str
+
+    :param expert:  when set to True, enabled "expert" mode.
+                    This conveys, the inclusion of parameters: --disable-web-security ----disable-site-isolation-trials,
+                    as well as some scripts and patching useful for debugging (for example, ensuring shadow-root is always in "open" mode)
+    :type expert: bool
+
     :return:
     """
     if not config:
+
         config = Config(
             user_data_dir,
             headless,
@@ -67,6 +86,9 @@ async def start(
             browser_args,
             sandbox,
             lang,
+            host=host,
+            port=port,
+            expert=expert,
             **kwargs,
         )
     from .browser import Browser
@@ -160,9 +182,10 @@ def filter_recurse_all(
             if predicate(child):
                 # if predicate is True
                 out.append(child)
+            if child.shadow_roots is not None:
+                out.extend(filter_recurse_all(child.shadow_roots[0], predicate))
             out.extend(filter_recurse_all(child, predicate))
-            # if result:
-            #     out.append(result)
+
     return out
 
 
@@ -182,6 +205,10 @@ def filter_recurse(doc: T, predicate: Callable[[cdp.dom.Node, Element], bool]) -
             if predicate(child):
                 # if predicate is True
                 return child
+            if child.shadow_roots:
+                shadow_root_result = filter_recurse(child.shadow_roots[0], predicate)
+                if shadow_root_result:
+                    return shadow_root_result
             result = filter_recurse(child, predicate)
             if result:
                 return result

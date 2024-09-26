@@ -255,6 +255,7 @@ class Connection(metaclass=CantTouchThis):
         :type event_type_or_domain:
         :param handler:
         :type handler:
+
         :return:
         :rtype:
         """
@@ -299,7 +300,6 @@ class Connection(metaclass=CantTouchThis):
         # when a websocket connection is closed (either by error or on purpose)
         # and reconnected, the registered event listeners (if any), should be
         # registered again, so the browser sends those events
-
         await self._register_handlers()
 
     async def aclose(self):
@@ -316,6 +316,22 @@ class Connection(metaclass=CantTouchThis):
     async def sleep(self, t: Union[int, float] = 0.25):
         await self.update_target()
         await asyncio.sleep(t)
+
+    def feed_cdp(self, cdp_obj):
+        """
+        used in specific cases, mostly during cdp.fetch.RequestPaused events,
+        in which the browser literally blocks. using feed_cdp you can issue
+        a response without a blocking "await".
+
+        note: this method won't cause a response.
+        note: this is not an async method, just a regular method!
+
+        :param cdp_obj:
+        :type cdp_obj:
+        :return:
+        :rtype:
+        """
+        asyncio.ensure_future(self.send(cdp_obj))
 
     async def wait(self, t: Union[int, float] = None):
         """
@@ -395,6 +411,13 @@ class Connection(metaclass=CantTouchThis):
         await self.aopen()
         if not self.websocket or self.closed:
             return
+        if self._owner:
+            browser = self._owner
+            if browser.config:
+                if browser.config.expert:
+                    await self._prepare_expert()
+                if browser.config.headless:
+                    await self._prepare_headless()
         if not self.listener or not self.listener.running:
             self.listener = Listener(self)
         try:
@@ -415,6 +438,7 @@ class Connection(metaclass=CantTouchThis):
         except Exception:
             await self.aclose()
 
+    #
     async def _register_handlers(self):
         """
         ensure that for current (event) handlers, the corresponding
@@ -467,6 +491,59 @@ class Connection(metaclass=CantTouchThis):
             # temp variable when we registered it or saw handlers for it.
             # items still present at this point are unused and need removal
             self.enabled_domains.remove(ed)
+
+    async def _prepare_headless(self):
+
+        if getattr(self, "_prep_headless_done", None):
+            return
+        response, error = await self._send_oneshot(
+            cdp.runtime.evaluate(
+                expression="navigator.userAgent",
+                user_gesture=True,
+                await_promise=True,
+                return_by_value=True,
+                allow_unsafe_eval_blocked_by_csp=True,
+            )
+        )
+        if response and response.value:
+            ua = response.value
+            await self._send_oneshot(
+                cdp.network.set_user_agent_override(
+                    user_agent=ua.replace("Headless", ""),
+                )
+            )
+        setattr(self, "_prep_headless_done", True)
+
+    async def _prepare_expert(self):
+        if getattr(self, "_prep_expert_done", None):
+            return
+        if self._owner:
+            await self._send_oneshot(
+                cdp.page.add_script_to_evaluate_on_new_document(
+                    """
+                    Element.prototype._attachShadow = Element.prototype.attachShadow;
+                    Element.prototype.attachShadow = function () {
+                        return this._attachShadow( { mode: "open" } );
+                    };
+                """
+                )
+            )
+
+            await self._send_oneshot(cdp.page.enable())
+        setattr(self, "_prep_expert_done", True)
+
+    async def _send_oneshot(self, cdp_obj):
+
+        tx = Transaction(cdp_obj)
+        tx.connection = self
+        tx.id = -2
+        self.mapper.update({tx.id: tx})
+        await self.websocket.send(tx.message)
+        try:
+            # in try except since if browser connection sends this it reises an exception
+            return await tx
+        except ProtocolException:
+            pass
 
 
 class Listener:
@@ -551,11 +628,21 @@ class Listener:
                 # response to our command
                 if message["id"] in self.connection.mapper:
                     # get the corresponding Transaction
-                    tx = self.connection.mapper[message["id"]]
-                    logger.debug("got answer for %s", tx)
+
+                    # thanks to zxsleebu for discovering the memory leak
+                    # pop to prevent memory leaks
+                    tx = self.connection.mapper.pop(message["id"])
+                    logger.debug("got answer for %s (message_id:%d)", tx, message["id"])
+
                     # complete the transaction, which is a Future object
                     # and thus will return to anyone awaiting it.
                     tx(**message)
+                else:
+                    if message["id"] == -2:
+                        tx = self.connection.mapper.get(-2)
+                        if tx:
+                            tx(**message)
+                        continue
             else:
                 # probably an event
                 try:
@@ -585,9 +672,15 @@ class Listener:
                     for callback in callbacks:
                         try:
                             if iscoroutinefunction(callback) or iscoroutine(callback):
-                                await callback(event)
+                                try:
+                                    await callback(event, self.connection)
+                                except TypeError:
+                                    await callback(event)
                             else:
-                                callback(event)
+                                try:
+                                    callback(event, self.connection)
+                                except TypeError:
+                                    callback(event)
                         except Exception as e:
                             logger.warning(
                                 "exception in callback %s for event %s => %s",

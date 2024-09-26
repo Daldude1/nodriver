@@ -72,7 +72,13 @@ Some words about the Element class
 
 #### *async* save_to_dom()
 
+saves element to dom
+:return:
+:rtype:
+
 #### *async* remove_from_dom()
+
+removes the element from dom
 
 #### *async* update(\_node=None)
 
@@ -99,9 +105,7 @@ therefore, it is not advised to call this method on a bunch of blocks (100+) at 
 
 #### *property* node
 
-#### *property* tree *: [Node](../cdp/dom.md#nodriver.cdp.dom.Node)*
-
-#### *property* parent *: [Element](#nodriver.Element) | [None](https://docs.python.org/3/library/constants.html#None)*
+#### *property* tree*: [Node](../cdp/dom.md#nodriver.cdp.dom.Node)*
 
 #### *property* attrs
 
@@ -109,16 +113,22 @@ attributes are stored here, however, you can set them directly on the element ob
 :return:
 :rtype:
 
-#### *property* children *: [List](https://docs.python.org/3/library/typing.html#typing.List)[[Element](#nodriver.Element)] | [str](https://docs.python.org/3/library/stdtypes.html#str)*
+#### *property* parent*: [Element](#nodriver.Element) | [None](https://docs.python.org/3/library/constants.html#None)*
+
+get the parent element (node) of current element(node)
+:return:
+:rtype:
+
+#### *property* children*: [List](https://docs.python.org/3/library/typing.html#typing.List)[[Element](#nodriver.Element)] | [str](https://docs.python.org/3/library/stdtypes.html#str)*
 
 returns the elements’ children. those children also have a children property
 so you can browse through the entire tree as well.
 :return:
 :rtype:
 
-#### *property* remote_object *: [RemoteObject](../cdp/runtime.md#nodriver.cdp.runtime.RemoteObject)*
+#### *property* remote_object*: [RemoteObject](../cdp/runtime.md#nodriver.cdp.runtime.RemoteObject)*
 
-#### *property* object_id *: [RemoteObjectId](../cdp/runtime.md#nodriver.cdp.runtime.RemoteObjectId)*
+#### *property* object_id*: [RemoteObjectId](../cdp/runtime.md#nodriver.cdp.runtime.RemoteObjectId)*
 
 #### *async* click()
 
@@ -149,14 +159,14 @@ eg:
 * **Return type:**
   `Position`
 
-#### *async* mouse_click(button='left', buttons=1, modifiers=0, \_until_event=None)
+#### *async* mouse_click(button='left', buttons=1, modifiers=0, hold=False, \_until_event=None)
 
 native click (on element) . note: this likely does not work atm, use click() instead
 
 * **Parameters:**
   * **button** ([`str`](https://docs.python.org/3/library/stdtypes.html#str)) – str (default = “left”)
   * **buttons** ([`Optional`](https://docs.python.org/3/library/typing.html#typing.Optional)[[`int`](https://docs.python.org/3/library/functions.html#int)]) – which button (default 1 = left)
-  * **modifiers** ([`Optional`](https://docs.python.org/3/library/typing.html#typing.Optional)[[`int`](https://docs.python.org/3/library/functions.html#int)]) –  *(Optional)* Bit field representing pressed modifier keys.
+  * **modifiers** ([`Optional`](https://docs.python.org/3/library/typing.html#typing.Optional)[[`int`](https://docs.python.org/3/library/functions.html#int)]) – *(Optional)* Bit field representing pressed modifier keys.
     Alt=1, Ctrl=2, Meta/Command=4, Shift=8 (default: 0).
   * **\_until_event** ([`Optional`](https://docs.python.org/3/library/typing.html#typing.Optional)[[`type`](https://docs.python.org/3/library/functions.html#type)]) – internal. event to wait for before returning
 * **Returns:**
@@ -165,6 +175,19 @@ native click (on element) . note: this likely does not work atm, use click() ins
 
 moves mouse (not click), to element position. when an element has an
 hover/mouseover effect, this would trigger it
+
+#### *async* mouse_drag(destination, relative=False, steps=1)
+
+drag an element to another element or target coordinates. dragging of elements should be supported  by the site of course
+
+* **Parameters:**
+  * **destination** ([*Element*](#nodriver.Element) *or* *coordinate as x**,**y tuple*) – another element where to drag to, or a tuple (x,y) of ints representing coordinate
+  * **relative** ([`bool`](https://docs.python.org/3/library/functions.html#bool)) – when True, treats coordinate as relative. for example (-100, 200) will move left 100px and down 200px
+  * **steps** ([*int*](https://docs.python.org/3/library/functions.html#int)) – move in <steps> points, this could make it look more “natural” (default 1),
+    but also a lot slower.
+    for very smooth action use 50-100
+* **Returns:**
+* **Return type:**
 
 #### *async* scroll_into_view()
 
@@ -178,7 +201,7 @@ clears an input field
 
 send text to an input field, or any other html element.
 
-hint, if you ever get stuck where using py:meth:`~click`
+hint, if you ever get stuck where using py:meth:~click
 does not work, sending the keystroke n or rn or a spacebar work wonders!
 
 * **Parameters:**
@@ -195,7 +218,7 @@ needles to say, but make sure the field accepts multiple files if you want to se
 otherwise the browser might crash.
 
 example :
-`await fileinputElement.send_file('c:/temp/image.png', 'c:/users/myuser/lol.gif')`
+await fileinputElement.send_file(‘c:/temp/image.png’, ‘c:/users/myuser/lol.gif’)
 
 #### *async* focus()
 
@@ -214,7 +237,7 @@ does not work in all cases.
 
 #### *async* get_html()
 
-#### *property* text *: [str](https://docs.python.org/3/library/stdtypes.html#str)*
+#### *property* text*: [str](https://docs.python.org/3/library/stdtypes.html#str)*
 
 gets the text contents of this element
 note: this includes text in the form of script content, as those are also just ‘text nodes’
@@ -231,7 +254,11 @@ note: this includes text in the form of script content, as those are also just �
 
 #### *async* query_selector_all(selector)
 
+like js querySelectorAll()
+
 #### *async* query_selector(selector)
+
+like js querySelector()
 
 #### *async* save_screenshot(filename='auto', format='jpeg', scale=1)
 
@@ -254,10 +281,17 @@ When the element is hidden, or has no size, or is otherwise not capturable, a Ru
 displays for a short time a red dot on the element (only if the element itself is visible)
 
 * **Parameters:**
-  * **coords** (*x* *,**y*) – x,y
+  * **coords** (*x**,**y*) – x,y
   * **duration** ([`Union`](https://docs.python.org/3/library/typing.html#typing.Union)[[`float`](https://docs.python.org/3/library/functions.html#float), [`int`](https://docs.python.org/3/library/functions.html#int)]) – seconds (default 0.5)
 * **Returns:**
 * **Return type:**
+
+#### *async* highlight_overlay()
+
+highlights the element devtools-style. To remove the highlight,
+call the method again.
+:return:
+:rtype:
 
 #### *async* record_video(filename=None, folder=None, duration=None)
 
