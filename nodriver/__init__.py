@@ -20,4 +20,5 @@ __all__ = [
     "util",
     "Element",
     "ContraDict",
+    "input",
 ]
